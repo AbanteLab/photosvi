@@ -11,6 +11,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:        # redeploy without a commit
 
 permissions:
   contents: read
@@ -50,7 +51,8 @@ jobs:
     # the day the repository is opened, with no workflow change -- and until then the
     # build still runs on every push, which is the part that catches broken docs.
     if: >-
-      github.ref == 'refs/heads/main' && github.event_name == 'push'
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.event.repository.visibility == 'public'
     needs: build
     runs-on: ubuntu-latest
