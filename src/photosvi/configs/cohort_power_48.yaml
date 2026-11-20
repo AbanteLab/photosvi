@@ -1,0 +1,121 @@
+# The hierarchical benchmark, on the axis that matters to someone planning an experiment:
+# how the five analyses behave as the number of animals changes, in the complete two-condition
+# design the recordings actually have.
+#
+# Derived from cohort_comparison.yaml on 2026-10-02 and differing from it in exactly the ways
+# the real cohort differs from the old simulated one:
+#
+#   two conditions, not three   vehicle and treated, with delta the difference between them.
+#                               The three-drug study stays in its own config.
+#   48 Hz, 40.5 min             the recordings' rate and the analysed window.
+#   sigma_y 0.01299             measured on the recordings, not 0.1062.
+#   mu_a -3.421, sigma_a 0.331  the mark distribution measured from the same peaks.
+#   K10 + AR(2)                 the kernel fitted to these animals and the emission fitted
+#                               to their pre-injection baseline.
+#   mark_gate_floor 0.10        1/W at W=10 (was 0.20 at W=5). Without it the mark posterior's width is unconstrained
+#                               wherever no event is, and on real data it ran away.
+#   block_init_at_prior         the block's diagonal starts at the prior rather than ten
+#                               times tighter, so the posterior WIDTH converges in a third
+#                               of the steps. It reaches the same answer either way, which
+#                               was measured by bracketing.
+#
+# n_animals here is a default; the grid overrides it per cell with N_ANIMALS.
+name: cohort_power_48
+cohort:
+  n_animals: 5
+  mu_saline: 0.2
+  sigma_animal: 0.25
+  sigma_cell: 0.1
+  beta0_mean: -2.85
+  sigma_b0: 0.22
+  sigma_b0_session: 0.2
+  sigma_y: 0.01299
+  T: 116591
+  inj_t: 28800
+  inj_jitter: 2880
+  # The drug-induced slow response, as an amplitude in the trace's own units.
+  #
+  # WAS 3.939445759311477 until 2026-10-05, inherited from cohort_comparison.yaml -- where
+  # it is the OPIOID entry of a per-drug vector -- while sigma_y was recalibrated from
+  # 0.1062 to 0.01299 and mu_a from 1.7666 to -3.421. The transient and the noise came
+  # down by about 180x and this stayed, which left the slow response at 303 noise sds and
+  # 121 times the transient amplitude. The recordings carry 16 and 9.5: the real cohort's
+  # fit puts it at 0.0001 for saline, 0.1962 for morphine and 0.1535 for fentanyl.
+  #
+  # It matters because the slow response and the change in transient rate both start at
+  # the injection, so they are nearly confounded, and at 121 times the transient a
+  # fraction of a percent of misfit in the slow part is the whole of the effect. The cell
+  # simulated with the old value is kept at runs_power/crossed_n5__tonic3.94.
+  #
+  # Equal across the two arms, which was and remains deliberate: it keeps the whole drug
+  # contrast in the event rate rather than letting part of it hide in the slow response.
+  tonic_peak:
+  - 0.1962
+  - 0.1962
+  tonic_k_rise:
+  - 0.005
+  - 0.005
+  tonic_k_decay:
+  - 0.0009
+  - 0.0009
+  tonic_drift: -7.920000000000001
+  fs: 48
+  mu_a: -3.421
+  sigma_a: 0.331
+  ar_coeffs:
+  - 1.432
+  - -0.4464
+  kernel:
+    family: bigamma
+    shape_fast: 5.68
+    rate_fast: 9.98
+    shape_slow: 11.5
+    rate_slow: 3.59
+  kernel_length: 384
+grid:
+  # A regular grid in log rate ratio (2026-10-07, was 0.2, 0.4, 0.7): ratios 1.28, 1.65,
+  # 2.12, 2.72. main_delta is the one the text quotes.
+  delta:
+  - 0.0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1.0
+  main_delta: 0.5
+  n_replicates:
+    '0.00': 60
+    default: 30
+fit:
+  # Mark distribution anchored on the visible peaks of the pre-injection segments
+  # (photosvi.experiments.marks), 2026-10-09: free, mu_a collapses 0.6-1.2 and beta0 rises
+  # 0.7-2 at every SNR.
+  mark_prior:
+    mu_sd: 0.05
+    log_sigma_sd: 0.05
+  # Hierarchical fits (build_cohort_model): the mark distribution is FIXED at the pooled
+  # estimate; the single-trace two-stage fits keep the prior above.
+  fix_marks: true
+  mark_gate_floor: 0.1
+  lr: 0.01
+  tau: 0.2   # was 0.5; 0.5 fits noise with fractional events (residual 0.87 sigma_y) and attenuates beta_inj (slope 0.31 vs 0.84 at SNR 1.95), 2026-10-09
+  window: 10
+  stop_probe: 3000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 15000
+  max_steps: 60000
+  beta0_prior_scale: 2.0
+  beta_prior: normal
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+  mu_b0_prior_scale: 2.0
+  mu_drug_prior_scale: 1.0
+  beta_guide: fullrank
+  hier_beta_guide: fullrank_z
+  block_init_at_prior: true
+warm:
+  thresh: 2.5
+  gain: 2.0
+detection:
+  refractory: 15        # bins; the single-trace benchmark's value (benchmark_guppy_48), 2026-10-09
+  mf_thresh: 2.5

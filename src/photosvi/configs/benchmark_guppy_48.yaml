@@ -1,0 +1,152 @@
+# The single-trace benchmark against GuPPy, at 48 Hz -- the recordings' own rate.
+#
+# It ran at 25 Hz until 2026-09-30. Moving it is not cosmetic: two of the statistics the
+# simulator is calibrated against are not comparable across sampling rates, so a 25 Hz
+# benchmark could only be anchored to the 48 Hz recordings through a conversion, and that
+# conversion is where three separate errors hid. At the recordings' own rate
+# there is nothing to convert.
+#
+# THREE knobs are in BINS and are converted, not copied. Copying them would have been
+# silent and wrong:
+#   kernel.length     125 -> 400   (5 s at 25 Hz; K9 needs 274 taps at 48 Hz, 400 is 8.3 s)
+#   detection.refractory 8 -> 15   (0.32 s either way)
+#   guide.window        5 -> 10    (0.2 s either way)
+# `detection.tol_s` is already in seconds and the code multiplies by fs. beta0 is a
+# log-rate per SECOND, mu_a/sigma_a are amplitudes, and the tonic constants are per second
+# or per hour, so none of those move.
+#
+# THE KERNEL is K9 and the emission is the AR(2) measured on the recordings. phi is the
+# Yule-Walker fit AT 48 Hz, [1.6706, -0.6739], rather than the 25 Hz pair converted --
+# same poles (2.04 s and 54 ms), one fewer conversion to get wrong.
+#
+# THE sigma_y GRID is 2, 3, 4 and nothing else, by decision 2026-10-01. The level that
+# matters is 3: the one dimensionless quantity comparable between simulation and recording
+# is peak height over local noise, 4.28 measured against 4.33 at sigma_y = 3 -- a 1% error.
+#
+# An earlier composite over six statistics preferred 2.0, and that was an artefact of how
+# it was normalised: dividing each error by its target makes the low-frequency slope, whose
+# target is -0.14, dominate everything. Normalised instead by the spread BETWEEN THE TWO
+# ANIMALS -- which is the honest scale, since it asks whether the simulator is closer to a
+# recording than two recordings are to each other -- sigma_y = 3 wins outright, 5.2 against
+# 26.3. Dropping the slope entirely makes 2 and 3 tie.
+#
+# 2 and 4 are kept as the neighbours, so the figures carry a spread rather than a point.
+# Levels of 0.5 and 1.0 were dropped: they are easy regimes that no recording occupies, and
+# they are where GuPPy wins, so including them would have padded the comparison at the one
+# end nobody is going to encounter.
+#
+# GROUND TRUTH, set 2026-10-01:
+#   beta_inj = ln(2) = 0.693147. The paper assumes a two-fold effect. Earlier configs
+#   carried ln(4) (benchmark) and 1.0201 (identifiability), which would not have lined up
+#   across tables.
+#   beta0 = -2.30, a true rate of ~10.5 events/min (6.6 pre, 12.0 post). NOT calibrated
+#   against the simulator's DETECTED rate, because that cannot be done: raising beta0 from
+#   -2.85 to -2.40 moves the true rate 5.7 -> 9.3/min while the detected rate stays at
+#   8.1-8.4, since at K9's width the transients merge. The detector saturates below the
+#   9.9-10.9 peaks/min the recordings show. So the argument is a BOUND instead: the
+#   recordings' detected rate is a lower bound on their true rate, and the old beta0 put
+#   the simulator's true rate at 5.7, clearly under it.
+#   The realised count ratio is 1.82 rather than 2.00 because p = 1 - exp(-lambda dt)
+#   saturates slightly at this rate; the script reports the count MLE separately.
+#
+# AR COEFFICIENTS updated 2026-10-01 to the MEAN over the five animals of the third
+#   batch, phi = [1.432, -0.4464], fitted per animal in the ten minutes before the last
+#   injection. They were [1.6706, -0.6739] -- the Yule-Walker fit to the two animals of the
+#   previous batch, which turn out to be the SMOOTHEST of the seven: per animal phi_1 runs
+#   1.261 to 1.686 and the lag-one correlation of the first differences 0.27 to 0.69, and
+#   the old pair sat at the top. That is why the simulator came out smoother than the
+#   recordings (lag-1 0.72 against 0.44 measured).
+#   This is a single shared value and the spread above says that needs justifying: the
+#   honest version is one phi per session, like sigma_y. Not done.
+#   Checked and rejected: a separate white term. Fitting AR(2) + measurement noise to each
+#   of the five puts the white variance at 0.000% of the total and makes the AIC WORSE in
+#   all five. DL55 and DL56 do look whiter, and the reason is a shorter fast pole, not a
+#   second source -- an AR(2) with small coefficients approaches white continuously.
+#
+# THE KERNEL is K10, refitted 2026-10-01 on the five animals of the dataset the paper
+#   uses -- 285 isolated transients in the ten minutes before the last injection -- rather
+#   than K9, which came from the two animals of a preliminary batch. It halves the residual
+#   (0.0071 against 0.0154) and improves it in every animal, and it is NARROWER: FWHM
+#   0.500 s against K9's 0.646, where the five recordings measure 0.375 to 0.542. That is
+#   the safer direction, since a too-slow kernel biases the rate ratio upward
+#   by 19% while a too-fast one biases it down by 13%.
+#
+name: benchmark_guppy_48
+grid:
+  sigma_y:
+  - 2.0
+  - 3.0
+  - 4.0
+  seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+data:
+  fs: 48
+  T: 115200
+  inj_t: 28800
+gt:
+  beta0: -2.3
+  beta_inj: 0.693147
+  sigma_y: 3.0
+  mu_a: 1.7666
+  sigma_a: 0.212
+tonic:
+  b: -0.3406
+  peak: 3.939445759311477
+  k_rise: 0.005
+  k_decay: 0.0009
+  drift: -7.920000000000001
+kernel:
+  length: 400
+  fit:
+    family: bigamma
+    shape_fast: 5.68
+    rate_fast: 9.98
+    shape_slow: 11.5
+    rate_slow: 3.59
+fit:
+  steps: 15000
+  probe: 250
+  lr: 0.01
+  stop_probe: 3000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 15000
+  max_steps: 60000
+  tau: 0.2
+  beta0_prior_scale: 3.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 2.0
+  beta_prior: normal
+  beta_guide: fullrank
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+heldout:
+  steps: 2000
+  every: 2
+  lr: 0.005
+  seed_offset: 1000
+detection:
+  tol_s: 0.35
+  refractory: 15
+  thresh: 0.5
+  mf_thresh: 2.5
+emission:
+  ar_coeffs:
+  - 1.432
+  - -0.4464
+guide:
+  window: 10

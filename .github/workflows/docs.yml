@@ -1,0 +1,62 @@
+# Build the documentation on every push, and publish it from main.
+#
+# The build runs with --strict, so a dead link or a missing include fails rather
+# than shipping a broken page. The examples themselves are executed by the test
+# suite in ci.yml, not here: they are Python, and their job is to fail when the API
+# moves, which is a test concern.
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[docs]"
+      - name: Build
+        run: mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    # Only from main: a pull request should prove the docs build, not publish them.
+    #
+    # And only when the repository is PUBLIC. GitHub Pages is not available on a
+    # private organization repository outside Enterprise Cloud, so the deploy step
+    # fails with a 404 and turns the workflow red on every push while the build
+    # itself was fine. Gating on visibility means this starts publishing by itself
+    # the day the repository is opened, with no workflow change -- and until then the
+    # build still runs on every push, which is the part that catches broken docs.
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'push'
+      && github.event.repository.visibility == 'public'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

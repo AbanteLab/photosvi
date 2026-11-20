@@ -1,0 +1,67 @@
+# A deliberately tiny configuration, for documentation examples and smoke tests.
+#
+# Two minutes of recording instead of forty, and a few hundred SVI steps instead of
+# tens of thousands, so an example runs in seconds and can be executed in CI on every
+# push. The numbers it produces are NOT the paper's and are not meant to be: at this
+# length a trace carries a few dozen transients, so the rate estimate is dominated by
+# counting noise. Use it to learn the API, not to judge the method.
+#
+# The realistic settings are in configs/benchmark_guppy.yaml (single trace) and
+# configs/cohort_comparison.yaml (cohort).
+name: toy
+
+data:
+  fs: 25
+  T: 3000                 # 2 min
+  inj_t: 750              # injection a quarter of the way in, as in the real protocol
+
+gt:
+  beta0: -2.8539
+  beta_inj: 1.3863        # ln 4
+  sigma_y: 0.1062
+  mu_a: 1.7666
+  sigma_a: 0.2120
+
+tonic:
+  b: -0.3406
+  # Peak height of the tonic bump in the trace's units. Held the textbook Bateman
+  # amplitude 7.0 until 2026-09-17, converted by its own peak factor so the
+  # recordings this generates are unchanged. See tonic.py: with k_rise close to
+  # k_decay the amplitude is not the height of anything, and a simulation is
+  # better specified by the quantity a recording would actually constrain.
+  peak: 3.939445759311477
+  k_rise: 0.0050
+  k_decay: 0.0009
+  # Per HOUR. Was per second until 2026-09-17; the stored value is the same drift,
+  # multiplied by 3600. A rate against a tau running to 1800 s takes a gradient
+  # step at the end of a recording 1800 times the size of its step at the start,
+  # and that -- not the Bateman amplitude -- is what made the fitted tonic swing
+  # between 0.15 and 1.6 on a real trace of standard deviation 0.021.
+  drift: -7.920000000000001
+
+kernel:
+  length: 125
+  fit:
+    family: biphasic
+    k_rise_fast: 20.0
+    k_decay_fast: 9.0
+    k_rise_slow: 8.0
+    k_decay_slow: 3.5
+
+fit:
+  steps: 600
+  lr: 0.01
+  tau: 0.5
+  window: 5
+  beta0_prior_scale: 2.0
+  beta_prior: uniform
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+
+warm:
+  thresh: 2.5
+  gain: 2.0
+
+detection:
+  refractory: 8
+  mf_thresh: 2.5

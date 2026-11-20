@@ -1,0 +1,149 @@
+# THE simulator, as of 2026-09-30. One canonical description, so that experiments
+# stop each carrying their own trimmed copy and disagreeing about what "simulated" means.
+#
+# Three things changed today, each measured against the two raw .doric recordings rather
+# than chosen.
+#
+# 1. THE KERNEL is K9, a difference of two gammas, fitted to the peak-triggered average
+#    of 476 isolated real transients. The old K5 is five times too narrow on both the
+#    rise and the decay, which showed up as 37 detected events per minute against 9.9
+#    real -- not extra events, a detector splitting one transient into four.
+#    kernel_length is 200 and NOT free: this family is not mean-free under truncation.
+#
+# 2. THE NOISE is an AR(2) and there is no separate slow component. An
+#    Ornstein-Uhlenbeck sampled at a fixed step IS an AR(1), so `ou_sd` was the same
+#    process under a second name and is deprecated. Two poles rather than one because
+#    the recordings carry two timescales -- about 2 s and 50 ms -- and Yule-Walker on
+#    them puts the lag-one correlation of the trace's differences at +0.672 against
+#    +0.677 measured, where ANY AR(1) gives -0.004. Converted to 25 Hz the poles give
+#    phi = [1.45738, -0.46752].
+#
+#    The AR sits in the EMISSION, not on the mean, which is why it replaced the OU: the
+#    model can score it. White noise is now just its phi = () case.
+#
+# 3. sigma_y CARRIES THE AMPLITUDE of that process and is 3.0, not 0.1062. It is no
+#    longer a small nuisance near the digitiser floor -- it is the dominant term, nearly
+#    three times the transients themselves (whose contribution is sd ~1.07).
+#
+#    TWO INDEPENDENT anchors agree on 3.0, which is why it is not a tuned number:
+#      * peak height over local noise, the only dimensionless quantity we can compare
+#        directly, is 4.26 in the recordings and 4.41 here. sigma_y itself is NOT
+#        comparable -- this trace has sd ~3.2 against the real dF/F's 0.046, a factor of
+#        69 -- so any claim that a noise level is realistic has to come from a ratio.
+#      * the composite distance over six statistics bottoms out at 3.0 (0.169).
+#
+#    That second one was WRONG until the sampling rates were matched. The recordings are
+#    48 Hz and these simulations are 25 Hz, and two of the six statistics are not
+#    rate-invariant: the lag-one correlation of the first differences reads +0.65 at
+#    48 Hz and +0.50 at 25 Hz (DL55 moves +0.63 to +0.39), and the low-frequency spectral
+#    slope changes SIGN, +0.20 to -0.12. Calibrated against the 48 Hz figures the answer
+#    came out 1.0 to 1.5; against the matched ones it is 3.0.
+#
+#    This makes the simulator much harder than it was, and that is the point. At the old
+#    0.1062 the noise was a tenth of the signal, and the recovery error there (-6%) was
+#    earned in a regime the recordings do not occupy. Here it is -25%.
+
+# What this config does NOT settle, deliberately:
+#   - the residual mismatch: sl/fa is 0.93 against 1.22 measured and the peak height
+#     over local noise 5.6 against 4.3. Six summary statistics from two animals is not
+#     much to tune against, and these were not forced.
+#   - the spectral SLOPE. Real is -3.6 to -4.6 past 8 Hz; this AR(2) gives about -2.8.
+#     An AR(3) fitted to the same traces reaches -3.3 / -4.3 and is a one-line change
+#     if it turns out to matter. It has not been tested for identifiability.
+#   - WHERE the fast 50 ms pole comes from. The lock-in amplifier's time constant, the
+#     sensor's kinetics and the decimation are all plausible and nobody has asked.
+#   - whether K9 becomes the default kernel. A too-slow kernel biases the
+#     estimand UPWARD (+19%), which is the direction that would inflate a drug effect.
+
+# AR COEFFICIENTS updated 2026-10-01 to the MEAN over the five animals of the third
+#   batch, phi = [1.432, -0.4464], fitted per animal in the ten minutes before the last
+#   injection. They were [1.6706, -0.6739] -- the Yule-Walker fit to the two animals of the
+#   previous batch, which turn out to be the SMOOTHEST of the seven: per animal phi_1 runs
+#   1.261 to 1.686 and the lag-one correlation of the first differences 0.27 to 0.69, and
+#   the old pair sat at the top. That is why the simulator came out smoother than the
+#   recordings (lag-1 0.72 against 0.44 measured).
+#   This is a single shared value and the spread above says that needs justifying: the
+#   honest version is one phi per session, like sigma_y. Not done.
+#   Checked and rejected: a separate white term. Fitting AR(2) + measurement noise to each
+#   of the five puts the white variance at 0.000% of the total and makes the AIC WORSE in
+#   all five. DL55 and DL56 do look whiter, and the reason is a shorter fast pole, not a
+#   second source -- an AR(2) with small coefficients approaches white continuously.
+#
+# THE KERNEL is K10, refitted 2026-10-01 on the five animals of the dataset the paper
+#   uses -- 285 isolated transients in the ten minutes before the last injection -- rather
+#   than K9, which came from the two animals of a preliminary batch. It halves the residual
+#   (0.0071 against 0.0154) and improves it in every animal, and it is NARROWER: FWHM
+#   0.500 s against K9's 0.646, where the five recordings measure 0.375 to 0.542. That is
+#   the safer direction, since a too-slow kernel biases the rate ratio upward
+#   by 19% while a too-fast one biases it down by 13%.
+#
+name: simulator_2026_09_30
+grid:
+  arms:
+  - cat
+  seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+data:
+  fs: 25
+  T: 60000
+  inj_t: 15000
+gt:
+  beta0: -2.8539
+  beta_inj: 1.0201
+  sigma_y: 3.0
+  mu_a: 1.7666
+  sigma_a: 0.212
+tonic:
+  b: -0.3406
+  peak: 7.967771248061421
+  k_rise: 0.0018
+  k_decay: 0.0001
+  drift: -7.920000000000001
+kernel:
+  length: 200
+  fit:
+    family: bigamma
+    shape_fast: 5.68
+    rate_fast: 9.98
+    shape_slow: 11.5
+    rate_slow: 3.59
+fit:
+  steps: 60000
+  probe: 1000
+  lr: 0.01
+  stop_probe: 3000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 15000
+  max_steps: 60000
+  tau: 0.2
+  beta0_prior_scale: 3.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 2.0
+  beta_prior: normal
+  beta_guide: fullrank
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+heldout:
+  steps: 40
+  every: 4
+  lr: 0.005
+  seed_offset: 1000
+detection:
+  tol_s: 0.35
+  refractory: 8
+  thresh: 0.5
+  mf_thresh: 2.5
+emission:
+  ar_coeffs:
+  - 1.432
+  - -0.4464

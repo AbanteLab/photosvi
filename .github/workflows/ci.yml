@@ -1,0 +1,71 @@
+# Lint, tests, coverage, and an installability check.
+#
+# The coverage floor is set where the project actually is, not where it should
+# ideally be: a floor nobody meets on day one is noise that gets ignored, and then
+# the check stops meaning anything.
+#
+# There is deliberately NO `ruff format --check`. It would reformat 33 files today,
+# which is a mechanical diff that makes `git blame` useless and catches no bug. Add
+# it only alongside a decision to reformat the codebase once, on purpose.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # one Python version failing should not hide the other
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,docs]"
+      - name: Lint
+        run: ruff check src tests
+      - name: Tests and coverage
+        run: |
+          pytest tests/ -q --cov=photosvi --cov-report=term-missing:skip-covered \
+                 --cov-fail-under=88
+
+  install:
+    # Everything above runs against an editable install in an environment that already
+    # has the dependencies. This checks the thing a new user actually does: build the
+    # package, install it clean, and run the command.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Build and install from the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          pip install dist/*.whl
+      - name: The console script exists and dispatches
+        run: |
+          cd /tmp                      # not the source tree, so imports come from the wheel
+          photosvi --help
+          python -c "import photosvi; from photosvi.models.points import SingleTraceModel, HierarchicalModel; print(photosvi.__name__, 'ok')"
+      - name: The examples run from the wheel alone
+        # The configs the defaults come from are package data; a wheel without them
+        # installs fine and fails at the first fit. Running the examples outside the
+        # source tree is what catches that.
+        run: |
+          cp docs/examples/*.py /tmp/
+          cd /tmp
+          python single_trace.py
+          python cohort.py

@@ -1,0 +1,94 @@
+# Guide-family sweep: five variational families over the SAME generative points model.
+#
+# Detection should land all five in the same band -- that is what forecloses "the fit was
+# bad" and licenses reading the recovery leg. Recovery tracks the ELBO, the betas (as
+# ev/min) and a held-out score on a common step axis, to test whether any step count
+# would have been the right one to stop at.
+#
+# Everything below the `grid` block must be identical across arms, or the comparison
+# measures the setup rather than the guide.
+
+name: points_guide_sweep
+
+grid:
+  arms: [free, free-warm, amort, free+c, amort+c]
+  seeds: [0, 1, 2]
+
+data:
+  fs: 25
+  T: 60000              # 40 min at 25 Hz
+  inj_t: 15000          # injection at 10 min
+
+# Frozen morphine ground truth (nb65 -> nb66). True effect exp(beta_inj) = 2.77x.
+gt:
+  beta0: -2.8539        # 3.46 ev/min pre
+  beta_inj: 1.0201      # 9.59 ev/min post
+  sigma_y: 0.1062
+  mu_a: 1.7666
+  sigma_a: 0.2120
+
+tonic:
+  b: -0.3406
+  # Peak height of the tonic bump in the trace's units. Held the textbook Bateman
+  # amplitude 10.0 until 2026-09-17, converted by its own peak factor so the
+  # recordings this generates are unchanged. See tonic.py: with k_rise close to
+  # k_decay the amplitude is not the height of anything, and a simulation is
+  # better specified by the quantity a recording would actually constrain.
+  peak: 7.967771248061421
+  k_rise: 0.0018
+  k_decay: 0.0001
+  # Per HOUR. Was per second until 2026-09-17; the stored value is the same drift,
+  # multiplied by 3600. A rate against a tau running to 1800 s takes a gradient
+  # step at the end of a recording 1800 times the size of its step at the start,
+  # and that -- not the Bateman amplitude -- is what made the fitted tonic swing
+  # between 0.15 and 1.6 on a real trace of standard deviation 0.021.
+  drift: -7.920000000000001        # kept, not stripped (supervisor directive 2026-07-08)
+
+kernel:
+  length: 125
+  # ARCHIVAL: this is the grid that produced runs/, kept so that result set stays
+  # reproducible and readable. Superseded by points_guide_sweep_{nonneg,k5,k5_misspec}.
+  # It carries the old deliberate decay mismatch (gen 1.3 vs fit 1.0), which was
+  # dropped on 2026-09-07: k_decay is asserted rather than estimated, so misspecifying
+  # it conflates "the guide is bad" with "the kernel is wrong".
+  fit:
+    family: biexp
+    k_rise: 2.0
+    k_decay: 1.0
+    normalize: peak
+  gen:
+    family: biexp
+    k_rise: 2.0
+    k_decay: 1.3
+    normalize: peak
+
+fit:
+  steps: 15000
+  probe: 250            # checkpoint cadence -> 61 checkpoints
+  lr: 0.001
+  tau: 0.5
+  # beta0's prior sits at the matched-filter anchor but is deliberately WIDE, so the fit
+  # is free to leave it. A tight prior would pin beta0 and hide the thing being measured.
+  beta0_prior_scale: 2.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 1.0
+
+# Matched-filter warm start (the `free-warm` block, and the held-out probe's local init).
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+
+heldout:
+  steps: 2000           # local budget. Do NOT cut: an under-converged refit depresses the
+                        # score in exactly the shape the experiment looks for.
+  every: 2              # probe every Nth checkpoint (~31 probes/arm)
+  lr: 0.005
+  seed_offset: 1000     # held-out trace = generate(seed + offset): unseen, same GT
+
+detection:
+  tol_s: 0.35           # +/- 9 bins at 25 Hz
+  refractory: 8         # NMS window, predeclared and identical across arms
+  thresh: 0.5           # "calling as shipped"; best-F1 is the tuned ceiling
+  mf_thresh: 2.5        # score above which a pre-injection MF peak counts for the anchor

@@ -1,0 +1,120 @@
+# Two-stage vs hierarchical: can either tell two opioids apart?
+#
+# Design, fixed to the one that gets run: every animal receives vehicle and both
+# opioids, three sessions on three different days. Saline is the within-animal
+# control for the handling response; both opioids are active, and the question is
+# whether they can be distinguished from each other.
+#
+# Session ORDER is not modelled -- see the note in experiments/cohort.py. The order
+# confound is real and the remedy is counterbalancing in the experiment; simulating
+# it here would let the hierarchical arm demonstrate that it absorbs a confound the
+# real cohort may not have. It becomes an axis once covariates land.
+
+name: cohort_comparison
+
+cohort:
+  n_animals: 8                # -> 24 sessions per cohort
+  # saline is NOT zero: handling and the injection raise the rate on their own.
+  mu_saline: 0.20
+  mu_opioid1: 1.10            # 3.0x
+  sigma_animal: 0.25          # between-animal responsiveness (cancels within animal)
+  sigma_cell: 0.10            # animal x drug interaction
+  beta0_mean: -2.85
+  sigma_b0: 0.22
+  sigma_b0_session: 0.20      # day-to-day baseline drift -- the level beta0 needs
+  sigma_y: 0.1062
+  T: 60000                    # 40 min at 25 Hz -- realistic, and NOT to be shortened:
+  inj_t: 15000                # T sets per-session precision, and the balance between
+  inj_jitter: 1500            # that and between-animal spread is what is under study.
+
+  # One pharmacokinetic curve PER DRUG, indexed (saline, opioid1, opioid2). The tonic
+  # carrier is the drug's absorption and elimination, and opioids differ in exactly
+  # that -- opioid1 peaks at ~7 min and is still at a third of peak by the end of the
+  # recording, opioid2 peaks at ~2.4 min and is essentially gone. An earlier version
+  # gave both opioids the same curve, which made a drug-structured tonic untestable:
+  # there was nothing to find, so a null result would have meant nothing.
+  # Peak height of each drug's tonic bump, in the trace's units. Held the textbook
+  # Bateman amplitudes [1.2, 7.0, 6.0] until 2026-09-17; each was multiplied by its
+  # own peak factor, so the curves this generates are unchanged. See tonic.py for
+  # why the amplitude was the wrong coordinate to specify a simulation in.
+  tonic_peak:    [0.4618802153517006, 3.939445759311477, 3.209953463886826]
+  tonic_k_rise:  [0.0060, 0.0050, 0.0140]
+  tonic_k_decay: [0.0020, 0.0009, 0.0028]
+  # Bleaching is a property of the recording, not the drug, so it stays scalar --
+  # and in the model it stays per-session and unpooled for the same reason.
+  # Per HOUR. Was per second until 2026-09-17; the stored value is the same drift,
+  # multiplied by 3600. A rate against a tau running to 1800 s takes a gradient
+  # step at the end of a recording 1800 times the size of its step at the start,
+  # and that -- not the Bateman amplitude -- is what made the fitted tonic swing
+  # between 0.15 and 1.6 on a real trace of standard deviation 0.021.
+  tonic_drift: -7.920000000000001
+
+grid:
+  # The estimand is mu_drug[opioid2] - mu_drug[opioid1]. Delta = 0 is the null cell
+  # and it is not a control -- it is what calibrates every arm's threshold, so that
+  # power is compared at a common false-positive rate rather than F1 being read off
+  # methods that call differences at different rates.
+  delta: [0.00, 0.20, 0.40, 0.70]
+  n_replicates:
+    "0.00": 60                # the null needs enough to resolve 5% from 15%
+    default: 30
+
+fit:
+  # Floor on the gated mark divergence. Gating by q(s_t) is right -- a mark at a bin with no
+  # event is never used -- but it leaves q(a)'s WIDTH unconstrained at those bins, where the
+  # right answer is the prior. On this cohort the width drifted from 0.7 to 30 over eleven
+  # thousand steps and killed the fit. The floor charges the empty bins a hundredth of their
+  # divergence, which is enough to hold them at the prior and nothing at the bins that do
+  # hold an event, whose gate is near one either way. Zero is the old behaviour.
+  mark_gate_floor: 0.01
+  # Same fixed model as everywhere else: analytic Bernoulli KL, tied + gated marks.
+  lr: 0.01
+  tau: 0.5
+  window: 10
+  stop_probe: 3000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 15000
+  max_steps: 60000
+  # The hierarchical estimand is a vector (mu_drug); the criterion takes the WORST
+  # coordinate's drift. A fit is not finished because the drug that settled first has.
+  beta0_prior_scale: 2.0
+  beta_prior: uniform
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+  mu_b0_prior_scale: 2.0
+  mu_drug_prior_scale: 1.0
+  # The variational family, one key per arm, because the two arms fit different
+  # models and the legal values differ: SingleTraceModel takes meanfield|fullrank,
+  # HierarchicalModel also takes fullrank_za|fullrank_z. Both are named here rather
+  # than left to a constructor default -- that default is `meanfield`, and the first
+  # 519 per-session fits of this study silently took it.
+  #
+  # beta_guide, the per-session arm. Measured on 18 sessions at this trace length
+  # against a known truth (scripts/session_guide_test.py): the reported interval is
+  # 3.91x too narrow under meanfield and 1.50x under fullrank, with 90% coverage
+  # going 22% -> 67%. The point estimate is unchanged (error sd 0.220 vs 0.227), as
+  # it must be -- the guide does not move the optimum, only the curvature reported
+  # around it.
+  beta_guide: fullrank
+  # hier_beta_guide, the cohort arm. Measured across 22 matched seeds
+  # (scripts/cohort_report.py, arms runs_cohort_fr vs runs_cohort_frz): the drug
+  # contrast's interval is 1.95x too narrow with the 8-dim block over the globals
+  # alone, and 1.08x with the block widened to carry every non-centred z. Coverage
+  # 59% -> 82%. It is not slower: 37.7 ms/step against 40.2, because a 72x72
+  # Cholesky is free next to 2.9 M per-bin latents.
+  #
+  # Why the wider block and not a better optimiser: z_cell is correlated with the
+  # contrast, and a guide that factorises over it drops that covariance from the
+  # reported curvature instead of propagating it. The cost is a noisier point
+  # estimate (error sd 0.113 against 0.085) and less bias (+0.002 against -0.008),
+  # which is the right trade -- a narrow interval is not conservative, it is wrong.
+  hier_beta_guide: fullrank_z
+
+warm:
+  thresh: 2.5
+  gain: 2.0
+
+detection:
+  refractory: 8
+  mf_thresh: 2.5

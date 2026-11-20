@@ -1,0 +1,77 @@
+# The same 2x2 again at the noise level that matches the ONE dimensionless anchor
+# we have: peak height over local noise, which the real recordings put at 4.3 and
+# which needs sigma_y = 3.0. sigma_y itself is not comparable to the recordings --
+# the simulator's trace has sd 3.17 against the real dF/F's 0.046, a factor of 69 --
+# so calling any particular value 'realistic' has to be argued from a ratio, not
+# from the number. At 1.5 the simulated transients are still ~30% easier to see
+# than the real ones.
+
+name: k9_ar2_snr_white_fit
+grid:
+  arms:
+  - cat
+  seeds:
+  - 0
+  - 1
+  - 2
+data:
+  fs: 25
+  T: 18000
+  inj_t: 6000
+gt:
+  beta0: -2.8539
+  beta_inj: 1.0201
+  sigma_y: 3.0
+  mu_a: 1.7666
+  sigma_a: 0.212
+tonic:
+  b: -0.3406
+  peak: 7.967771248061421
+  k_rise: 0.0018
+  k_decay: 0.0001
+  drift: -7.920000000000001
+kernel:
+  length: 200
+  fit:
+    family: bigamma
+    shape_fast: 20.34
+    rate_fast: 15.65
+    shape_slow: 15.4
+    rate_slow: 3.95
+fit:
+  steps: 6000
+  probe: 500
+  lr: 0.01
+  stop_probe: 1000
+  stop_tol: 0.02
+  stop_window: 4
+  stop_min_steps: 3000
+  max_steps: 6000
+  tau: 0.2
+  beta0_prior_scale: 3.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 2.0
+  beta_prior: normal
+  beta_guide: fullrank
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+heldout:
+  steps: 40
+  every: 4
+  lr: 0.005
+  seed_offset: 1000
+detection:
+  tol_s: 0.35
+  refractory: 8
+  thresh: 0.5
+  mf_thresh: 2.5
+emission:
+  ar_coeffs:
+  - 1.45738
+  - -0.46752
+  fit_ar_coeffs: []

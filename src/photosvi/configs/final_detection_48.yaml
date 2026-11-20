@@ -1,0 +1,104 @@
+# THE PAPER'S FINAL MODEL AND SIMULATOR (frozen 2026-10-21, tag paper-final-v1). One
+# architecture for every PhotoSVI fit: `fit.architecture: paper_final` builds the
+# single-trace model through photosvi.experiments.single_trace, shared by the detection
+# benchmark, the two-stage cohort arm and photosvi.api; the cohort model reads the same
+# `fit` keys. Marks fixed in noise units (a_t = sigma_y r_t, r_t ~ LogNormal(ln 1.95, 0.75^2)),
+# sigma_y read off each recording (per session in the cohort model), tonic block with the
+# per-session deviations, one gate floor (0.1), beta0 ~ N(anchor, 2^2), beta_inj ~ N(0, 1).
+# Simulation: no drift (residual drift after isosbestic correction is ~-0.05/h on the
+# recordings), marks drawn at the config's absolute mu_a with sigma 0.75, so a cell's SNR
+# is e^{mu_a}/sigma_y and the sigma_y grid sweeps it; the fit keeps mu_r = ln 1.95 at every
+# level (well specified at the medium level, misspecified at high and low by design).
+# Detection benchmark (Table 1, Fig. 2): sigma_y grid 2, 3, 4 -> SNR 2.93, 1.95, 1.46.
+name: final_detection_48
+grid:
+  sigma_y:
+  - 2.0
+  - 3.0
+  - 4.0
+  seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+data:
+  fs: 48
+  T: 115200
+  inj_t: 28800
+gt:
+  beta0: -2.3
+  beta_inj: 0.693147
+  sigma_y: 3.0
+  mu_a: 1.7666
+  sigma_a: 0.212
+tonic:
+  b: -0.3406
+  # The cohort config's calibrated tonic peak (0.1962 dF/F at sigma_y 0.016757) in these units
+  # (sigma_y 3 at medium SNR, factor 179.03; the marks already agree, e^mu_a = 5.85 in both).
+  # It was 3.94, left over from before the cohort config was rescaled to the recordings'
+  # units on 2026-10-05, which put the tonic peak at 1.3 sigma_y instead of 11.7 (2026-10-28).
+  peak: 35.1256
+  k_rise: 0.005
+  k_decay: 0.0009
+  drift: 0.0
+kernel:
+  length: 400
+  fit:
+    family: bigamma
+    shape_fast: 5.68
+    rate_fast: 9.98
+    shape_slow: 11.5
+    rate_slow: 3.59
+fit:
+  steps: 15000
+  probe: 250
+  lr: 0.01
+  stop_probe: 3000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 15000
+  max_steps: 60000
+  tau: 0.2
+  beta0_prior_scale: 2.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 1.0
+  beta_prior: normal
+  beta_guide: fullrank
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+  architecture: paper_final
+  mark_mode: noise_units
+  mark_noise_units:
+    mu: 0.668
+    sigma: 0.75
+    gen_mu_a: spec
+    gen_sigma: 0.75
+  mark_gate_floor: 0.1
+  window: 10
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+heldout:
+  steps: 2000
+  every: 2
+  lr: 0.005
+  seed_offset: 1000
+detection:
+  tol_s: 0.35
+  refractory: 15
+  thresh: 0.5
+  mf_thresh: 2.5
+emission:
+  ar_coeffs:
+  - 1.432
+  - -0.4464
+guide:
+  window: 10

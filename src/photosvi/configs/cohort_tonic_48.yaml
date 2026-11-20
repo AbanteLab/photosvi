@@ -1,0 +1,89 @@
+# The tonic-response cohort benchmark: the second cohort benchmark, kept
+# apart from the rate benchmark (cohort_power_48.yaml) so that each tool is tested where it
+# applies. Same crossed design, kernel, emission and medium SNR; the transient rate does NOT
+# differ between conditions (delta = 0) and the tonic peak height does: condition 1 has
+# P0 = cohort.tonic_peak[0] and condition 2 has (1 + dP) P0, dP over grid.tonic_dp. The
+# per-condition peak is set by photosvi.experiments.tonic_benchmark.tonic_config, which
+# writes one config per dP for the existing cohort scripts to read.
+#
+# Marks: the noise-unit mode (a_t = sigma_y r_t, r_t ~ LogNormal(0.668, 0.75^2), fixed),
+# with one sigma_y per session in the cohort model -- the formulation under test on
+# 2026-10-20, which this benchmark is meant to run with.
+name: cohort_tonic_48
+cohort:
+  n_animals: 5
+  mu_saline: 0.2
+  sigma_animal: 0.25
+  sigma_cell: 0.1
+  beta0_mean: -2.85
+  sigma_b0: 0.22
+  sigma_b0_session: 0.2
+  sigma_y: 0.016757
+  T: 116591
+  inj_t: 28800
+  inj_jitter: 2880
+  tonic_peak:
+  - 0.1962
+  - 0.1962
+  tonic_k_rise:
+  - 0.005
+  - 0.005
+  tonic_k_decay:
+  - 0.0009
+  - 0.0009
+  tonic_drift: -7.920000000000001
+  fs: 48
+  mu_a: -3.421
+  sigma_a: 0.331
+  ar_coeffs:
+  - 1.432
+  - -0.4464
+  kernel:
+    family: bigamma
+    shape_fast: 5.68
+    rate_fast: 9.98
+    shape_slow: 11.5
+    rate_slow: 3.59
+  kernel_length: 384
+grid:
+  delta:
+  - 0.0
+  tonic_dp:
+  - 0.0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1.0
+  main_tonic_dp: 0.5
+  n_replicates:
+    default: 50
+fit:
+  mark_gate_floor: 0.1
+  lr: 0.01
+  tau: 0.2
+  window: 10
+  stop_probe: 3000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 15000
+  max_steps: 60000
+  beta0_prior_scale: 2.0
+  beta_prior: normal
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+  mu_b0_prior_scale: 2.0
+  mu_drug_prior_scale: 1.0
+  beta_guide: fullrank
+  hier_beta_guide: fullrank_z
+  block_init_at_prior: true
+  mark_mode: noise_units
+  mark_noise_units:
+    mu: 0.668
+    sigma: 0.75
+  sigma_y_per_session: true
+warm:
+  thresh: 2.5
+  gain: 2.0
+detection:
+  refractory: 15
+  mf_thresh: 2.5

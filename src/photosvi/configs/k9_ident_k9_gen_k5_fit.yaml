@@ -1,0 +1,81 @@
+# K9 identifiability, 2026-09-30. Trimmed from points_guide_sweep_k5.yaml so it
+# finishes on CPU in minutes: T is 12 min rather than 40, 6000 steps rather than 60000,
+# one arm (`cat`, the family
+# the paper ships), three seeds. Numbers are comparable ACROSS these four configs,
+# which share everything but the kernel, and not against the full grid.
+#
+# kernel.length is 200 for every arm including the K5 ones: the gamma family needs
+# 143 taps at 25 Hz and the biphasic one is mean-free at any length, so holding it
+# fixed removes support from the list of things that differ.
+# THIS CONFIG: gen K9, fit K5 -- the bias we are running today if the recordings are K9.
+
+name: k9_ident_k9_gen_k5_fit
+grid:
+  arms:
+  - cat
+  seeds:
+  - 0
+  - 1
+  - 2
+data:
+  fs: 25
+  T: 18000
+  inj_t: 6000
+gt:
+  beta0: -2.8539
+  beta_inj: 1.0201
+  sigma_y: 0.1062
+  mu_a: 1.7666
+  sigma_a: 0.212
+tonic:
+  b: -0.3406
+  peak: 7.967771248061421
+  k_rise: 0.0018
+  k_decay: 0.0001
+  drift: -7.920000000000001
+kernel:
+  length: 200
+  fit:
+    family: biphasic
+    k_rise_fast: 20.0
+    k_decay_fast: 9.0
+    k_rise_slow: 8.0
+    k_decay_slow: 3.5
+  gen:
+    family: bigamma
+    shape_fast: 20.34
+    rate_fast: 15.65
+    shape_slow: 15.4
+    rate_slow: 3.95
+fit:
+  steps: 6000
+  probe: 500
+  lr: 0.01
+  stop_probe: 1000
+  stop_tol: 0.02
+  stop_window: 4
+  stop_min_steps: 3000
+  max_steps: 6000
+  tau: 0.2
+  beta0_prior_scale: 3.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 2.0
+  beta_prior: normal
+  beta_guide: fullrank
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+heldout:
+  steps: 40
+  every: 4
+  lr: 0.005
+  seed_offset: 1000
+detection:
+  tol_s: 0.35
+  refractory: 8
+  thresh: 0.5
+  mf_thresh: 2.5

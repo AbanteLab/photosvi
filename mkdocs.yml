@@ -1,0 +1,68 @@
+# MkDocs Material. The API pages are generated from docstrings rather than
+# hand-written: the docstrings in this codebase carry the reasoning, not just the
+# signatures, and a hand-maintained copy of them would diverge within weeks.
+site_name: PhotoSVI
+site_description: >-
+  Point-process modelling of phasic dopamine in fiber photometry: transient
+  detection and drug-response rate estimation from one generative model.
+repo_url: https://github.com/AbanteLab/photosvi
+repo_name: AbanteLab/photosvi
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      toggle: {icon: material/weather-night, name: Switch to dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      toggle: {icon: material/weather-sunny, name: Switch to light mode}
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - footnotes
+  - pymdownx.details
+  - pymdownx.snippets: {base_path: ['.']}
+  - pymdownx.superfences
+  - pymdownx.arithmatex: {generic: true}
+  - toc: {permalink: true}
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Tutorials:
+      - Fit one recording: tutorials/single-trace.md
+      - Fit a cohort: tutorials/cohort.md
+  - Choosing your settings: settings.md
+  - Reproducing the detection benchmark: reproducing-the-benchmark.md
+  - API reference:
+      - Models: reference/models.md
+      - Inference: reference/inference.md
+      - Experiments: reference/experiments.md

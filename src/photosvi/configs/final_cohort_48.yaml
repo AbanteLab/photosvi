@@ -1,0 +1,95 @@
+# THE PAPER'S FINAL MODEL AND SIMULATOR (frozen 2026-10-21, tag paper-final-v1). One
+# architecture for every PhotoSVI fit: `fit.architecture: paper_final` builds the
+# single-trace model through photosvi.experiments.single_trace, shared by the detection
+# benchmark, the two-stage cohort arm and photosvi.api; the cohort model reads the same
+# `fit` keys. Marks fixed in noise units (a_t = sigma_y r_t, r_t ~ LogNormal(ln 1.95, 0.75^2)),
+# sigma_y read off each recording (per session in the cohort model), tonic block with the
+# per-session deviations, one gate floor (0.1), beta0 ~ N(anchor, 2^2), beta_inj ~ N(0, 1).
+# Simulation: no drift (residual drift after isosbestic correction is ~-0.05/h on the
+# recordings), marks drawn at the config's absolute mu_a with sigma 0.75, so a cell's SNR
+# is e^{mu_a}/sigma_y and the sigma_y grid sweeps it; the fit keeps mu_r = ln 1.95 at every
+# level (well specified at the medium level, misspecified at high and low by design).
+# Cohort benchmark (Table 2, Figs 3-4, SI tables): medium SNR sigma_y 0.016757 (SNR 1.95);
+# SIM_SIGMA_Y 0.011171 / 0.022343 for high / low (SNR 2.93 / 1.46).
+name: final_cohort_48
+cohort:
+  n_animals: 5
+  mu_saline: 0.2
+  sigma_animal: 0.25
+  sigma_cell: 0.1
+  beta0_mean: -2.85
+  sigma_b0: 0.22
+  sigma_b0_session: 0.2
+  sigma_y: 0.016757
+  T: 116591
+  inj_t: 28800
+  inj_jitter: 2880
+  tonic_peak:
+  - 0.1962
+  - 0.1962
+  tonic_k_rise:
+  - 0.005
+  - 0.005
+  tonic_k_decay:
+  - 0.0009
+  - 0.0009
+  tonic_drift: 0.0
+  fs: 48
+  mu_a: -3.421
+  sigma_a: 0.331
+  ar_coeffs:
+  - 1.432
+  - -0.4464
+  kernel:
+    family: bigamma
+    shape_fast: 5.68
+    rate_fast: 9.98
+    shape_slow: 11.5
+    rate_slow: 3.59
+  kernel_length: 400
+grid:
+  delta:
+  - 0.0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1.0
+  main_delta: 0.5
+  n_replicates:
+    default: 50
+fit:
+  mark_gate_floor: 0.1
+  lr: 0.01
+  tau: 0.2
+  window: 10
+  stop_probe: 3000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 15000
+  max_steps: 60000
+  beta0_prior_scale: 2.0
+  beta_prior: normal
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+  mu_b0_prior_scale: 2.0
+  mu_drug_prior_scale: 1.0
+  beta_guide: fullrank
+  hier_beta_guide: fullrank_z
+  block_init_at_prior: true
+  architecture: paper_final
+  mark_mode: noise_units
+  mark_noise_units:
+    mu: 0.668
+    sigma: 0.75
+    gen_mu_a: spec
+    gen_sigma: 0.75
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 1.0
+  sigma_y_per_session: true
+  tonic_block: with_sessions
+warm:
+  thresh: 2.5
+  gain: 2.0
+detection:
+  refractory: 15
+  mf_thresh: 2.5

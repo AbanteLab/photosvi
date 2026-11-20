@@ -1,0 +1,117 @@
+# Guide-family sweep: five variational families over the SAME generative points model.
+#
+# Detection should land all five in the same band -- that is what forecloses "the fit was
+# bad" and licenses reading the recovery leg. Recovery tracks the ELBO, the betas (as
+# ev/min) and a held-out score on a common step axis, to test whether any step count
+# would have been the right one to stop at.
+#
+# Everything below the `grid` block must be identical across arms, or the comparison
+# measures the setup rather than the guide.
+
+name: points_guide_sweep_smoke
+#
+# SMOKE variant: minutes, not hours. Proves every cell runs; the numbers are
+# meaningless (300 steps on 6k bins). Do not read results from this config.
+
+grid:
+  arms: [free, free-warm, amort, free+c, amort+c]
+  seeds: [0]
+
+data:
+  fs: 25
+  T: 6000
+  inj_t: 3000
+
+# Frozen morphine ground truth (nb65 -> nb66). True effect exp(beta_inj) = 2.77x.
+gt:
+  beta0: -2.8539        # 3.46 ev/min pre
+  beta_inj: 1.0201      # 9.59 ev/min post
+  sigma_y: 0.1062
+  mu_a: 1.7666
+  sigma_a: 0.2120
+
+tonic:
+  b: -0.3406
+  # Peak height of the tonic bump in the trace's units. Held the textbook Bateman
+  # amplitude 10.0 until 2026-09-17, converted by its own peak factor so the
+  # recordings this generates are unchanged. See tonic.py: with k_rise close to
+  # k_decay the amplitude is not the height of anything, and a simulation is
+  # better specified by the quantity a recording would actually constrain.
+  peak: 7.967771248061421
+  k_rise: 0.0018
+  k_decay: 0.0001
+  # Per HOUR. Was per second until 2026-09-17; the stored value is the same drift,
+  # multiplied by 3600. A rate against a tau running to 1800 s takes a gradient
+  # step at the end of a recording 1800 times the size of its step at the start,
+  # and that -- not the Bateman amplitude -- is what made the fitted tonic swing
+  # between 0.15 and 1.6 on a real trace of standard deviation 0.021.
+  drift: -7.920000000000001        # kept, not stripped (supervisor directive 2026-07-08)
+
+kernel:
+  length: 125
+  # Tracks the active basis (K5) so the smoke path exercises what the real grids use.
+  fit:
+    family: biphasic
+    k_rise_fast: 20.0
+    k_decay_fast: 9.0
+    k_rise_slow: 8.0
+    k_decay_slow: 3.5
+
+fit:
+  steps: 300
+  probe: 100
+  # Raised from 1e-3 on 2026-09-08. The low rate was containing an instability that
+  # turned out to be the mark drift; with that fixed the higher rate
+  # both lands closer to the count MLE and drifts less.
+  lr: 0.01
+  # Early stopping on the estimand, not the ELBO -- the relaxed bound swings across
+  # orders of magnitude and any plateau test on it fires on noise.
+  # The probe interval is load-bearing, not a logging detail: the window spans
+  # stop_probe * stop_window steps, and if that is short any slow stretch of the
+  # trajectory reads as a plateau. Measured -- at probe 1000 the criterion fired at
+  # step 6000 and reported 0.703 against a count MLE of 0.812; at probe 3000 the same
+  # window covers 18000 steps and it waits for the real one.
+  stop_probe: 3000
+  stop_tol: 0.02          # movement of the window's centre that still counts as settled
+  stop_window: 6          # probes held; halved to compare first against second
+  stop_min_steps: 15000
+  max_steps: 60000        # ceiling if the criterion never fires
+  tau: 0.5
+  # beta0's prior sits at the matched-filter anchor but is deliberately WIDE, so the fit
+  # is free to leave it. A tight prior would pin beta0 and hide the thing being measured.
+  beta0_prior_scale: 2.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 1.0
+  # Flat prior by default (2026-09-08). Measured on the K5 + analytic-KL fit: the old
+  # Normal(0, 1) on beta_inj was shrinking the estimate ~2% toward zero, consistently
+  # across seeds, and it buys nothing -- the posterior width is identical either way
+  # (scale 0.052), so the uncertainty reported is entirely the likelihood's. The
+  # reviewer's question "did your prior shrink your rate ratio?" then has a
+  # demonstrable no.
+  #
+  # Bounds are DERIVED, not written here: beta0's are the matched-filter anchor for
+  # this trace +/- beta0_halfwidth, because a hard number would eventually put a real
+  # animal's baseline outside the support, where the Uniform scores -inf and the fit
+  # fails silently. beta_inj is a log-ratio, so its bounds stay centred on zero.
+  beta_prior: uniform
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+
+# Matched-filter warm start (the `free-warm` block, and the held-out probe's local init).
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+
+heldout:
+  steps: 60
+  every: 2              # probe every Nth checkpoint (~31 probes/arm)
+  lr: 0.005
+  seed_offset: 1000     # held-out trace = generate(seed + offset): unseen, same GT
+
+detection:
+  tol_s: 0.35           # +/- 9 bins at 25 Hz
+  refractory: 8         # NMS window, predeclared and identical across arms
+  thresh: 0.5           # "calling as shipped"; best-F1 is the tuned ceiling
+  mf_thresh: 2.5        # score above which a pre-injection MF peak counts for the anchor

@@ -1,0 +1,63 @@
+name: map_vs_bayes_offsets
+cohort:
+  n_animals: 6
+  mu_saline: 0.2
+  mu_opioid1: 1.1
+  sigma_animal: 0.25
+  sigma_cell: 0.1
+  beta0_mean: -2.85
+  sigma_b0: 0.22
+  sigma_b0_session: 0.2
+  sigma_y: 0.1062
+  T: 15000
+  inj_t: 3750
+  inj_jitter: 375
+  # Peak height of each drug's tonic bump, in the trace's units. Held the textbook
+  # Bateman amplitudes [1.2, 7.0, 6.0] until 2026-09-17; each was multiplied by its
+  # own peak factor, so the curves this generates are unchanged. See tonic.py for
+  # why the amplitude was the wrong coordinate to specify a simulation in.
+  tonic_peak:
+  - 0.4618802153517006
+  - 3.939445759311477
+  - 3.209953463886826
+  tonic_k_rise:
+  - 0.006
+  - 0.005
+  - 0.014
+  tonic_k_decay:
+  - 0.002
+  - 0.0009
+  - 0.0028
+  # Per HOUR. Was per second until 2026-09-17; the stored value is the same drift,
+  # multiplied by 3600. A rate against a tau running to 1800 s takes a gradient
+  # step at the end of a recording 1800 times the size of its step at the start,
+  # and that -- not the Bateman amplitude -- is what made the fitted tonic swing
+  # between 0.15 and 1.6 on a real trace of standard deviation 0.021.
+  tonic_drift: -7.920000000000001
+grid:
+  delta:
+  - 0.0
+  n_replicates:
+    '0.00': 18
+    default: 18
+fit:
+  lr: 0.01
+  tau: 0.5
+  window: 5
+  stop_probe: 1000
+  stop_tol: 0.02
+  stop_window: 6
+  stop_min_steps: 5000
+  max_steps: 20000
+  beta0_prior_scale: 2.0
+  beta_prior: uniform
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+  mu_b0_prior_scale: 2.0
+  mu_drug_prior_scale: 1.0
+warm:
+  thresh: 2.5
+  gain: 2.0
+detection:
+  refractory: 8
+  mf_thresh: 2.5

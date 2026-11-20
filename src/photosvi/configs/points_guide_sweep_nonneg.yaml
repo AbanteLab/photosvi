@@ -1,0 +1,129 @@
+# Guide-family sweep: five variational families over the SAME generative points model.
+#
+# Detection should land all five in the same band -- that is what forecloses "the fit was
+# bad" and licenses reading the recovery leg. Recovery tracks the ELBO, the betas (as
+# ev/min) and a held-out score on a common step axis, to test whether any step count
+# would have been the right one to stop at.
+#
+# Everything below the `grid` block must be identical across arms, or the comparison
+# measures the setup rather than the guide.
+
+name: points_guide_sweep_nonneg
+
+grid:
+  # `cat` is REFERENCE_ARM -- the family this paper ships -- and was missing from
+  # this grid until 2026-09-17, so S1 Text characterised only the per-bin family it
+  # replaced. `cat+c` is its coupled control, which is where the empty-baseline
+  # collapse now lives and so is the one that has to be shown, not assumed absent.
+  arms: [free, free-warm, amort, free+c, amort+c, cat, cat+c]
+  seeds: [0, 1, 2]
+
+data:
+  fs: 25
+  T: 60000              # 40 min at 25 Hz
+  inj_t: 15000          # injection at 10 min
+
+# Frozen morphine ground truth (nb65 -> nb66). True effect exp(beta_inj) = 2.77x.
+gt:
+  beta0: -2.8539        # 3.46 ev/min pre
+  beta_inj: 1.0201      # 9.59 ev/min post
+  sigma_y: 0.1062
+  mu_a: 1.7666
+  sigma_a: 0.2120
+
+tonic:
+  b: -0.3406
+  # Peak height of the tonic bump in the trace's units. Held the textbook Bateman
+  # amplitude 10.0 until 2026-09-17, converted by its own peak factor so the
+  # recordings this generates are unchanged. See tonic.py: with k_rise close to
+  # k_decay the amplitude is not the height of anything, and a simulation is
+  # better specified by the quantity a recording would actually constrain.
+  peak: 7.967771248061421
+  k_rise: 0.0018
+  k_decay: 0.0001
+  # Per HOUR. Was per second until 2026-09-17; the stored value is the same drift,
+  # multiplied by 3600. A rate against a tau running to 1800 s takes a gradient
+  # step at the end of a recording 1800 times the size of its step at the start,
+  # and that -- not the Bateman amplitude -- is what made the fitted tonic swing
+  # between 0.15 and 1.6 on a real trace of standard deviation 0.021.
+  drift: -7.920000000000001        # kept, not stripped (supervisor directive 2026-07-08)
+
+kernel:
+  length: 125           # 5 s of support at 25 Hz; K5 is under 1% of peak after 1.52 s
+
+  # The FITTED phasic basis. `gen` below defaults to this, so gen and fit match and the
+  # truth stays exactly representable -- k_decay is asserted, not estimated, and a
+  # mismatch in an asserted quantity conflates "the guide is bad" with "the kernel is
+  # wrong" in a sweep whose purpose is to attribute error to the guide.
+  fit:
+    family: biexp
+    k_rise: 2.0
+    k_decay: 1.3
+    normalize: peak
+    # The status-quo non-negative transient: h >= 0, so sum(h) > 0.
+fit:
+  steps: 15000
+  probe: 250            # checkpoint cadence -> 61 checkpoints
+  # Raised from 1e-3 on 2026-09-08. The low rate was containing an instability that
+  # turned out to be the mark drift; with that fixed the higher rate
+  # both lands closer to the count MLE and drifts less.
+  lr: 0.01
+  # Early stopping on the estimand, not the ELBO -- the relaxed bound swings across
+  # orders of magnitude and any plateau test on it fires on noise.
+  # The probe interval is load-bearing, not a logging detail: the window spans
+  # stop_probe * stop_window steps, and if that is short any slow stretch of the
+  # trajectory reads as a plateau. Measured -- at probe 1000 the criterion fired at
+  # step 6000 and reported 0.703 against a count MLE of 0.812; at probe 3000 the same
+  # window covers 18000 steps and it waits for the real one.
+  stop_probe: 3000
+  stop_tol: 0.02          # movement of the window's centre that still counts as settled
+  stop_window: 6          # probes held; halved to compare first against second
+  stop_min_steps: 15000
+  max_steps: 60000        # ceiling if the criterion never fires
+  # MATCHED TO points_guide_sweep_k5.yaml on 2026-09-17. Until then this sweep ran
+  # at tau 0.5, beta_prior uniform, prior scales 2.0/1.0 and the mean-field beta
+  # guide -- the settings k5 carried before the production freeze (26a3c96). The
+  # bases were therefore compared across five differences and not one, while S1
+  # Text said each difference was the one thing varied. Change the kernel here
+  # and nothing else.
+  tau: 0.2
+  # beta0's prior sits at the matched-filter anchor but is deliberately WIDE, so the fit
+  # is free to leave it. A tight prior would pin beta0 and hide the thing being measured.
+  beta0_prior_scale: 3.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 2.0
+  # Flat prior by default (2026-09-08). Measured on the K5 + analytic-KL fit: the old
+  # Normal(0, 1) on beta_inj was shrinking the estimate ~2% toward zero, consistently
+  # across seeds, and it buys nothing -- the posterior width is identical either way
+  # (scale 0.052), so the uncertainty reported is entirely the likelihood's. The
+  # reviewer's question "did your prior shrink your rate ratio?" then has a
+  # demonstrable no.
+  #
+  # Bounds are DERIVED, not written here: beta0's are the matched-filter anchor for
+  # this trace +/- beta0_halfwidth, because a hard number would eventually put a real
+  # animal's baseline outside the support, where the Uniform scores -inf and the fit
+  # fails silently. beta_inj is a log-ratio, so its bounds stay centred on zero.
+  beta_prior: normal
+  beta_guide: fullrank
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+
+# Matched-filter warm start (the `free-warm` block, and the held-out probe's local init).
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+
+heldout:
+  steps: 2000           # local budget. Do NOT cut: an under-converged refit depresses the
+                        # score in exactly the shape the experiment looks for.
+  every: 2              # probe every Nth checkpoint (~31 probes/arm)
+  lr: 0.005
+  seed_offset: 1000     # held-out trace = generate(seed + offset): unseen, same GT
+
+detection:
+  tol_s: 0.35           # +/- 9 bins at 25 Hz
+  refractory: 8         # NMS window, predeclared and identical across arms
+  thresh: 0.5           # "calling as shipped"; best-F1 is the tuned ceiling
+  mf_thresh: 2.5        # score above which a pre-injection MF peak counts for the anchor

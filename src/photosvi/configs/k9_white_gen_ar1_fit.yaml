@@ -1,0 +1,81 @@
+# K9 with a CORRELATED emission, 2026-09-30. Same trimmed setup as k9_ident_*: T is
+# 12 min, one arm (`cat`), three seeds, 6000 steps on CPU. Everything is identical
+# across these three and to k9_ident_k9_matched, which is the white reference --
+# the only thing that changes is the emission's lag-one correlation.
+#
+# rho = 0.5 is CALIBRATED, not picked: it puts the lag-one correlation of the
+# trace's first differences at +0.647 against +0.68 measured on the two real
+# recordings. The 0.818 used in earlier comparisons overshoots to +0.855 -- that
+# value was derived for K5, and K9 already carries some of the smoothness itself.
+#
+# rho is ASSERTED, like sigma_y and the kernel. These runs ask what a correlated
+# emission does to recovery, NOT whether rho can be estimated.
+# THIS CONFIG: gen white, fit AR(1) -- asserting correlation that is not there.
+
+name: k9_ar1_k9_white_gen_ar1_fit
+grid:
+  arms:
+  - cat
+  seeds:
+  - 0
+  - 1
+  - 2
+data:
+  fs: 25
+  T: 18000
+  inj_t: 6000
+gt:
+  beta0: -2.8539
+  beta_inj: 1.0201
+  sigma_y: 0.1062
+  mu_a: 1.7666
+  sigma_a: 0.212
+tonic:
+  b: -0.3406
+  peak: 7.967771248061421
+  k_rise: 0.0018
+  k_decay: 0.0001
+  drift: -7.920000000000001
+kernel:
+  length: 200
+  fit:
+    family: bigamma
+    shape_fast: 20.34
+    rate_fast: 15.65
+    shape_slow: 15.4
+    rate_slow: 3.95
+fit:
+  steps: 6000
+  probe: 500
+  lr: 0.01
+  stop_probe: 1000
+  stop_tol: 0.02
+  stop_window: 4
+  stop_min_steps: 3000
+  max_steps: 6000
+  tau: 0.2
+  beta0_prior_scale: 3.0
+  beta_inj_prior_loc: 0.0
+  beta_inj_prior_scale: 2.0
+  beta_prior: normal
+  beta_guide: fullrank
+  beta0_halfwidth: 5.0
+  beta_inj_halfwidth: 4.0
+warm:
+  thresh: 2.5
+  gain: 2.0
+  hi: 6.0
+  floor: -6.0
+heldout:
+  steps: 40
+  every: 4
+  lr: 0.005
+  seed_offset: 1000
+detection:
+  tol_s: 0.35
+  refractory: 8
+  thresh: 0.5
+  mf_thresh: 2.5
+emission:
+  ar_rho: 0.0
+  fit_ar_rho: 0.5

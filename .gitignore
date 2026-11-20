@@ -1,0 +1,51 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# experiment outputs
+outputs/
+*.pt
+*.npy
+
+# editor
+.idea/
+.vscode/
+.DS_Store
+
+# notebooks (local sandboxes)
+.ipynb_checkpoints/
+notebooks/
+
+# pytest
+.pytest_cache/
+
+#local config
+config/
+base_local_fast.yaml
+logs/
+
+# Run outputs and generated figures live outside the repo.
+#
+# What makes a result reproducible is the config, the seed and the code version, and
+# all three are tracked here. The JSONs are outputs: 1174 files and 92 MB of them,
+# in nineteen top-level directories, which is noise for anyone who arrives wanting to
+# use the tool. The numbers the paper cites live in its own repo as generated macros.
+#
+# Set PHOTOSVI_RUNS to choose where they go; the runner scripts default to
+# $PHOTOSVI_RUNS.
+runs/
+runs_*/
+outputs/
+diagnostics/
+logs/
+
+# pytest-cov artefact
+.coverage
+.coverage.*
+htmlcov/
