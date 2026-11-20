@@ -80,4 +80,6 @@ You need three things:
 
 For a cohort, additionally the `animal` and `drug` index vectors, one entry per
 recording. Preprocessing (isosbestic correction, bleaching, dF/F) happens upstream
-of this package.
+of the models; a Doric file is corrected on loading. To fit a recording from a file,
+from the command line or with one function call, see
+[Fit your own recordings](fit-your-recordings.md).

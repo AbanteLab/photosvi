@@ -62,6 +62,7 @@ cohorts. `MODEL_CARD.md` has the measurement.
 ## Where to start
 
 - [Getting started](getting-started.md): install, and a first fit in ten lines.
+- [Fit your own recordings](fit-your-recordings.md): a Doric file or a dF/F trace, from the command line or from Python.
 - [Fit one recording](tutorials/single-trace.md): the single-trace model end to end.
 - [Fit a cohort](tutorials/cohort.md): the hierarchical model, and reading a contrast.
 - [Choosing your settings](settings.md): what to change for your sensor and protocol.

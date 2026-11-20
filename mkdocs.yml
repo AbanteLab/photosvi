@@ -57,12 +57,15 @@ extra_javascript:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Fit your own recordings: fit-your-recordings.md
   - Tutorials:
       - Fit one recording: tutorials/single-trace.md
       - Fit a cohort: tutorials/cohort.md
   - Choosing your settings: settings.md
   - Reproducing the detection benchmark: reproducing-the-benchmark.md
   - API reference:
-      - Models: reference/models.md
-      - Inference: reference/inference.md
-      - Experiments: reference/experiments.md
+      - Python API: reference/api.md
+      - Internals:
+          - Models: reference/models.md
+          - Inference: reference/inference.md
+          - Experiments: reference/experiments.md
