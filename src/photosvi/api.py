@@ -108,6 +108,24 @@ class Session:
     def from_array(cls, trace, fs: float, inj_t: int, **kw) -> Session:
         return cls(trace=trace, fs=fs, inj_t=inj_t, **kw)
 
+    @classmethod
+    def from_channels(cls, signal, isosbestic, fs: float, *, inj_s: float,
+                      inj_end_s: float | None = None, mask_min_s: float = 0.0,
+                      als_lambda: float | None = None, name: str = "session",
+                      **metadata) -> Session:
+        """A Session from the raw sensor and isosbestic channels, corrected to dF/F.
+
+        The correction is the one applied to Doric files: the isosbestic channel is
+        scaled onto the sensor's baseline over the stretch before the injection and
+        divided out (`photosvi.data.preprocess.correct_isosbestic`). One second is trimmed
+        from each end, so `inj_t` of the result is shifted accordingly. The handling
+        window, from `inj_s` to the later of `inj_end_s` and `inj_s + mask_min_s`, is
+        masked from the likelihood.
+        """
+        return _from_channels(signal, isosbestic, fs, inj_start_s=inj_s, inj_end_s=inj_end_s,
+                              mask_min_s=mask_min_s, als_lambda=als_lambda, name=name,
+                              **metadata)[0]
+
     @property
     def n_samples(self) -> int:
         return int(self.trace.size)
@@ -470,7 +488,6 @@ def load_doric_session(path: Path | str, *, inj_start_s: float | None = None,
     is meant to change. Returns the Session and a dict saying where the times came from.
     """
     from photosvi.data.doric import read_doric
-    from photosvi.data.preprocess import correct_isosbestic
 
     path = Path(path)
     rec = read_doric(path)
@@ -489,8 +506,28 @@ def load_doric_session(path: Path | str, *, inj_start_s: float | None = None,
         if inj_end_s is not None:
             end = float(inj_end_s)
         source = f"doric event {key!r}"
-    fs = rec.fs
-    pp = correct_isosbestic(rec.signal, rec.isosbestic, fs, inj_t=int(round(start * fs)),
+    session, info = _from_channels(rec.signal, rec.isosbestic, rec.fs, inj_start_s=start,
+                                   inj_end_s=end, mask_min_s=mask_min_s,
+                                   als_lambda=als_lambda, name=name or path.stem,
+                                   **metadata)
+    info = dict(source=source, **info, layout=rec.layout, events=rec.events)
+    return session, info
+
+
+def _from_channels(signal, isosbestic, fs: float, *, inj_start_s: float,
+                   inj_end_s: float | None = None, mask_min_s: float = 0.0,
+                   als_lambda: float | None = None, name: str = "session",
+                   **metadata) -> tuple[Session, dict]:
+    """Correct two channels to dF/F and mask the handling window; the Session and a record.
+
+    Shared by Doric files and by traces that carry their own isosbestic column, so both are
+    corrected the same way.
+    """
+    from photosvi.data.preprocess import correct_isosbestic
+
+    start = float(inj_start_s)
+    end = float(inj_end_s) if inj_end_s is not None else start
+    pp = correct_isosbestic(signal, isosbestic, fs, inj_t=int(round(start * fs)),
                             smooth_green=False, als_lambda=als_lambda)
     trace = np.asarray(pp["dff"], np.float32)
     shift = int(round(start * fs)) - int(pp["inj_t"])   # the samples the trim removed
@@ -501,16 +538,22 @@ def load_doric_session(path: Path | str, *, inj_start_s: float | None = None,
     if hi > lo:
         mask = np.ones(trace.size, dtype=bool)
         mask[lo:min(hi, trace.size)] = False
-    info = dict(source=source, inj_start_s=start, inj_end_s=end, mask_s=(hi - lo) / fs,
-                fs=fs, layout=rec.layout, events=rec.events, trim_s=shift / fs)
-    return (Session(trace=trace, fs=fs, inj_t=inj_t, name=name or path.stem, mask=mask,
+    info = dict(inj_start_s=start, inj_end_s=end, mask_s=(hi - lo) / fs, fs=fs,
+                trim_s=shift / fs, isosbestic=True)
+    return (Session(trace=trace, fs=fs, inj_t=inj_t, name=name, mask=mask,
                     metadata=metadata), info)
 
 
 def load_session(path: Path | str, *, fs: float, inj_t: int | None = None,
                  inj_s: float | None = None, column: str | int | None = None,
+                 isosbestic_column: str | int | None = None,
                  name: str | None = None, **metadata) -> Session:
     """Read one recording from .csv, .txt, .npy or .npz.
+
+    Without `isosbestic_column` the trace (`column`) must already be corrected dF/F. With
+    it, `column` is the raw sensor channel and `isosbestic_column` the control, and the
+    two are corrected to dF/F as a Doric file is (see `Session.from_channels`); one
+    second is then trimmed from each end and `inj_t` of the result is shifted with it.
 
     `inj_s` is accepted as well as `inj_t` because an injection is recorded in
     seconds by whoever ran the experiment, and converting by hand is a good way to be
@@ -521,13 +564,30 @@ def load_session(path: Path | str, *, fs: float, inj_t: int | None = None,
         raise ValueError("give the injection as inj_t (bins) or inj_s (seconds)")
     if inj_t is None:
         inj_t = int(round(inj_s * fs))
+    name = name or path.stem
+    if isosbestic_column is not None:
+        if column is None:
+            raise ValueError("with an isosbestic column, `column` must name the sensor "
+                             "channel too")
+        return Session.from_channels(_read_trace(path, column),
+                                     _read_trace(path, isosbestic_column), fs,
+                                     inj_s=inj_t / fs, name=name, **metadata)
+    return Session(trace=_read_trace(path, column), fs=fs, inj_t=inj_t, name=name,
+                   metadata=metadata)
 
+
+def _read_trace(path: Path, column: str | int | None) -> np.ndarray:
+    """One channel of a .csv, .txt, .tsv, .npy or .npz file, as float32."""
     suffix = path.suffix.lower()
     if suffix == ".npy":
         arr = np.load(path)
+        if arr.ndim == 2 and isinstance(column, int):
+            arr = arr[:, column]
     elif suffix == ".npz":
         z = np.load(path)
         if isinstance(column, str):
+            if column not in z.files:
+                raise ValueError(f"no array {column!r} in {path}; it has {z.files}")
             key = column
         elif len(z.files) == 1:
             key = z.files[0]
@@ -549,8 +609,7 @@ def load_session(path: Path | str, *, fs: float, inj_t: int | None = None,
             f"expected one trace, got an array of shape {arr.shape}; pass `column` "
             "to choose one"
         )
-    return Session(trace=arr, fs=fs, inj_t=inj_t, name=name or path.stem,
-                   metadata=metadata)
+    return arr
 
 
 def _read_delimited(path: Path, column: str | int | None) -> np.ndarray:

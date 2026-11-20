@@ -7,7 +7,7 @@ on a slow pharmacokinetic baseline. Inference recovers where the events are and 
 a drug shifts their rate.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 from photosvi.models.points import SingleTraceModel
 

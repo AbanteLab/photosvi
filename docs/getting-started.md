@@ -72,14 +72,19 @@ expected events 42   (simulated 31)
 
 ## What you need from your own data
 
-You need three things:
+For each recording:
 
-1. **A trace**, as a `[1, T]` tensor of corrected dF/F, one recording.
-2. **The injection bin**, an integer index into that trace.
-3. **The sampling rate**, to set `dt`.
+1. **The signal**: either the raw sensor channel with its isosbestic control, or a trace
+   already corrected to dF/F.
+2. **The injection time**, in seconds (or read from a Doric file's events).
+3. **The sampling rate.**
 
-For a cohort, additionally the `animal` and `drug` index vectors, one entry per
-recording. Preprocessing (isosbestic correction, bleaching, dF/F) happens upstream
-of the models; a Doric file is corrected on loading. To fit a recording from a file,
-from the command line or with one function call, see
+For a cohort, additionally which animal and which condition each recording belongs to.
+
+The loaders do the isosbestic correction: a Doric file is corrected on loading, and so
+is any other file that gives the control channel (`load_session(...,
+isosbestic_column=...)`) or a pair of arrays (`Session.from_channels`). A trace already
+corrected to dF/F is used as it is. The example above works one level below, on a
+`[1, T]` tensor of dF/F and the injection bin, which is what the models themselves take.
+To fit a recording from a file, from the command line or with one function call, see
 [Fit your own recordings](fit-your-recordings.md).

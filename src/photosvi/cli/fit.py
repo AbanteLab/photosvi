@@ -3,9 +3,11 @@
     photosvi fit session.doric --out run/                      # injection from the file
     photosvi fit session.doric --inj-start 1502.6 --inj-end 1520.1 --out run/
     photosvi fit trace.csv --fs 48 --inj-start 600 --inj-end 640 --mask-min-s 120 --out run/
+    photosvi fit raw.csv --fs 48 --column signal --isosbestic-column iso --inj-start 600 --out run/
 
-A Doric file is corrected with its isosbestic channel to dF/F; any other file must already
-hold dF/F. The model has one injection: the times given (or, for a Doric file without them,
+A Doric file is corrected with its isosbestic channel to dF/F, and so is any other file
+given `--isosbestic-column` (`--column` is then the raw sensor channel); otherwise the file
+must already hold dF/F. The model has one injection: the times given (or, for a Doric file without them,
 the file's last injection event, or `--event`) are the one the rate contrast is read at.
 `--inj-end` closes the handling window excluded from the likelihood; `--mask-min-s`
 extends it to at least that many seconds after the injection. Times given on the command
@@ -26,7 +28,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("recording", help=".doric, or a dF/F trace (.csv, .txt, .tsv, .npy, .npz)")
     p.add_argument("--fs", type=float, default=None,
                    help="sampling rate in Hz (required unless the file is .doric)")
-    p.add_argument("--column", default=None, help="which column holds the trace")
+    p.add_argument("--column", default=None,
+                   help="which column holds the trace (name or index); with "
+                        "--isosbestic-column, the raw sensor channel")
+    p.add_argument("--isosbestic-column", default=None,
+                   help="column of the isosbestic control; the two are corrected to dF/F "
+                        "as a Doric file is")
     p.add_argument("--inj-start", type=float, default=None, help="injection start (s)")
     p.add_argument("--inj-end", type=float, default=None,
                    help="end of the handling window (s); masked from the likelihood")
@@ -46,6 +53,7 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         session, info = load_recording(a.recording, fs=a.fs, column=a.column,
+                                       isosbestic_column=a.isosbestic_column,
                                        inj_start_s=a.inj_start, inj_end_s=a.inj_end,
                                        event=a.event, mask_min_s=a.mask_min_s)
     except ValueError as exc:

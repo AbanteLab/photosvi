@@ -103,10 +103,11 @@ photosvi fit-cohort sessions.csv --reference vehicle --out run/     # a cohort
 [Fit your own recordings](https://abantelab.github.io/photosvi/fit-your-recordings/)
 describes the inputs, the table of sessions and what each command writes.
 
-From your own data you need three things: a trace as a `[1, T]` tensor of corrected
-dF/F, the injection bin, and the sampling rate. For a cohort, additionally the
-`animal` and `drug` index vectors. Preprocessing (isosbestic correction, bleaching,
-dF/F) happens upstream of this package.
+From your own data you need, for each recording, the raw sensor channel with its
+isosbestic control (or a trace already corrected to dF/F), the injection time and the
+sampling rate; for a cohort, also the animal and the condition. The isosbestic correction
+to dF/F is done on loading, for Doric files and for any file that gives the control
+channel.
 
 The transient kernel is fixed during a fit and should match your sensor. Calibrate it
 from your recordings first with `photosvi kernel calibrate` or `api.calibrate_kernel`,

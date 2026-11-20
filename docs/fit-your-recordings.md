@@ -8,10 +8,15 @@ Three things can be done from a file, either from the command line or from Pytho
   between conditions with between-animal variability in its interval;
 - **calibrate the kernel** to your sensor, before either fit.
 
-Each recording is a Doric `.doric` file, or a trace that is already corrected dF/F
-(`.csv`, `.txt`, `.tsv`, `.npy` or `.npz`). A Doric file is corrected to dF/F with its
-isosbestic channel, and can take its injection time from its events. For a trace file
-you give the sampling rate and the injection time in seconds.
+Each recording is a Doric `.doric` file, or a `.csv`, `.txt`, `.tsv`, `.npy` or `.npz`
+file. A Doric file is corrected to dF/F with its isosbestic channel, and can take its
+injection time from its events. Any other file holds either the raw sensor channel and
+its isosbestic control in two columns, which are corrected the same way, or a trace
+already corrected to dF/F; you give the sampling rate and the injection time in seconds.
+
+The correction scales the control onto the sensor's baseline over the stretch before the
+injection (at most the first 10 minutes) and divides it out. It needs a recording longer
+than 10 minutes, and trims one second from each end.
 
 Handling the animal at the injection moves the fibre and leaves artefacts at the moment
 the rate is meant to change, so a handling window after each injection is left out of
@@ -49,6 +54,8 @@ procedure is described in [Choosing your settings](settings.md#calibrating-it-fr
 photosvi kernel calibrate rec1.doric rec2.doric rec3.doric --mask-min-s 120 \
     --out kernel.yaml --plot kernel.pdf
 photosvi kernel calibrate rec1.csv rec2.csv --fs 48 --sensor GCaMP6f --out kernel.yaml
+photosvi kernel calibrate raw1.csv raw2.csv --fs 48 --column signal \
+    --isosbestic-column iso --inj-start 600 --mask-min-s 120 --out kernel.yaml
 photosvi kernel calibrate --sessions sessions.csv --mask-min-s 120 --out kernel.yaml
 ```
 
@@ -56,7 +63,8 @@ The command prints every candidate kernel with its error on transients it was no
 to, writes the suggested one to `kernel.yaml` and draws all of them over the average
 transient in `kernel.pdf`. `--choose` writes another candidate instead. `--sessions`
 takes a table of sessions (see below), which gives each file its own injection times;
-use it for Doric files that do not record the injection as an event.
+use it for Doric files that do not record the injection as an event, and for files with an
+isosbestic column injected at different times.
 
 Pass the file to either fit with `--kernel kernel.yaml`. From Python:
 
@@ -77,12 +85,17 @@ photosvi fit session.doric --mask-min-s 120 --out run/
 # a Doric file, injection times given
 photosvi fit session.doric --inj-start 1502.6 --inj-end 1520.1 --out run/
 
-# a dF/F trace in a text file, sampled at 48 Hz, with a calibrated kernel
+# the raw sensor and isosbestic channels in a text file, sampled at 48 Hz
+photosvi fit raw.csv --fs 48 --column signal --isosbestic-column iso \
+    --inj-start 600 --inj-end 640 --mask-min-s 120 --out run/
+
+# a dF/F trace, with a calibrated kernel
 photosvi fit trace.csv --fs 48 --inj-start 600 --inj-end 640 --mask-min-s 120 \
     --kernel kernel.yaml --out run/
 ```
 
-`--column` says which column holds the trace, if the file has several. The command prints
+`--column` says which column holds the trace, by header name or index, if the file has
+several; with `--isosbestic-column` it is the raw sensor channel. The command prints
 the rate ratio with its 90% interval and writes four files to `--out`:
 
 | file | contents |
@@ -97,12 +110,18 @@ the rate ratio with its 90% interval and writes four files to `--out`:
 From Python:
 
 ```python
-from photosvi.api import FitSettings, fit_session, load_doric_session, load_session
+from photosvi.api import FitSettings, Session, fit_session, load_doric_session, load_session
 
 # a Doric file; extra keyword arguments are stored as the session's metadata
 session, info = load_doric_session("session.doric", mask_min_s=120,
                                    animal="m1", condition="drug")
-# or a dF/F trace
+# or the raw sensor and isosbestic channels of a text file, corrected the same way
+session = load_session("raw.csv", fs=48, inj_s=600, column="signal",
+                       isosbestic_column="iso", animal="m1", condition="drug")
+# or two arrays already in memory
+session = Session.from_channels(signal, iso, fs=48, inj_s=600, inj_end_s=640,
+                                mask_min_s=120, animal="m1", condition="drug")
+# or a trace already corrected to dF/F
 session = load_session("trace.csv", fs=48, inj_s=600, animal="m1", condition="drug")
 
 result = fit_session(session, FitSettings(), on_progress=print)
@@ -137,7 +156,9 @@ m2_drug.csv,m2,drug,600,640
 reads from them which animals were recorded under which conditions, and so which
 variance components it can estimate. `inj_start` and `inj_end` are in seconds; an empty
 cell on a Doric file means the file's injection event. A trace file also needs `fs`, in
-the table or with `--fs`. Other columns are kept as metadata.
+the table or with `--fs`, and `column` and `isosbestic_column` say which columns hold
+the sensor channel and its control (leave `isosbestic_column` empty for a dF/F trace).
+Other columns are kept as metadata.
 
 ```bash
 photosvi fit-cohort sessions.csv --reference vehicle --mask-min-s 120 --out run/

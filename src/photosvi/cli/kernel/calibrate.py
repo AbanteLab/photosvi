@@ -11,8 +11,9 @@ transient so the choice can be checked by eye:
 
 A Doric file is corrected to dF/F with its isosbestic channel, and the handling window
 after its injection event is left out, so artefacts there are not taken for transients.
-Trace files must hold dF/F. `--sessions` takes the table of `photosvi fit-cohort`, which
-gives each file its own injection times.
+Trace files hold dF/F, or the raw sensor channel and its control with `--isosbestic-column`.
+`--sessions` takes the table of `photosvi fit-cohort`, which gives each file its own
+injection times.
 
 The suggested kernel is the one with the lowest held-out error; `--choose` overrides it
 by key (the keys are printed). See `photosvi.kernel_calibration` for the procedure.
@@ -28,7 +29,7 @@ from pathlib import Path
 import yaml
 
 from photosvi.api import Session, calibrate_kernel, load_doric_session, load_session
-from photosvi.cli.manifest import read_manifest
+from photosvi.cli.manifest import _col, load_recording, read_manifest
 from photosvi.kernel_calibration import SENSORS
 
 
@@ -42,6 +43,12 @@ def main(argv: list[str] | None = None) -> None:
                         help="sampling rate in Hz (required for trace files)")
     parser.add_argument("--mask-min-s", type=float, default=0.0,
                         help="leave out at least this many seconds after each injection")
+    parser.add_argument("--isosbestic-column", default=None,
+                        help="trace files hold the raw sensor channel in --column and the "
+                             "control here; corrected to dF/F as a Doric file is")
+    parser.add_argument("--inj-start", type=float, default=None,
+                        help="injection time (s) of the trace files, needed with "
+                             "--isosbestic-column")
     parser.add_argument("--column", default=None, help="which column holds the trace")
     parser.add_argument("--sensor", default="dLight1.3b", choices=sorted(SENSORS),
                         help="starting values for the fit (default dLight1.3b)")
@@ -107,7 +114,14 @@ def _one(path: Path, args) -> Session:
                              "injection times") from None
     if args.fs is None:
         raise ValueError(f"{path}: a trace file needs --fs")
-    return load_session(path, fs=args.fs, inj_t=0, column=args.column)
+    if args.isosbestic_column is not None:
+        if args.inj_start is None:
+            raise ValueError("--isosbestic-column needs --inj-start: the control is scaled "
+                             "on the stretch before the injection")
+        return load_recording(path, fs=args.fs, column=args.column,
+                              isosbestic_column=args.isosbestic_column,
+                              inj_start_s=args.inj_start, mask_min_s=args.mask_min_s)[0]
+    return load_session(path, fs=args.fs, inj_t=0, column=_col(args.column))
 
 
 if __name__ == "__main__":
