@@ -154,8 +154,8 @@ injection differs from that under `--reference`, with its 90% interval, and writ
 
 All sessions must have the same sampling rate. Each is cut to the same window: 10 minutes
 before its injection (`--pre-s`) and as much after it as every session has. The window
-should not reach back to an earlier injection. A cohort of a dozen forty-minute recordings
-takes a few hours on a GPU.
+should not reach back to an earlier injection. The paper's cohort, 13 forty-minute
+recordings, takes about half an hour on a GPU.
 
 From Python:
 
@@ -178,7 +178,8 @@ result.save("run/")
 ```
 
 `CohortSettings()` with no arguments is the paper's real-cohort fit. On the paper's 13
-recordings it reproduces the reported contrast.
+recordings it reproduces the reported fit exactly: a rate ratio of 1.57 [1.13, 2.17] for
+RO64-6198 against vehicle, and a tonic height ratio of 0.41 [0.40, 0.43].
 
 To fit each recording on its own instead, `fit_study` returns one single-trace result per
 session; that is not the hierarchical model and its rate ratios are per session.

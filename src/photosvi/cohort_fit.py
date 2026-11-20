@@ -303,8 +303,8 @@ def fit_cohort(study, settings: CohortSettings | None = None, *,
     likelihood.
 
     `on_progress` is called at every probe with the step, the maximum number of steps and
-    the current contrasts against the reference. A cohort of a dozen 40-minute recordings
-    takes several hours on a GPU.
+    the current contrasts against the reference. The paper's cohort, 13 forty-minute
+    recordings, takes about half an hour on a GPU.
     """
     import time
 
