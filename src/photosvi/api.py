@@ -39,12 +39,16 @@ __all__ = [
     "Result",
     "Session",
     "Study",
+    "CohortResult",
+    "CohortSettings",
     "calibrate_kernel",
     "config_path",
     "events_from_posterior",
+    "fit_cohort",
     "fit_session",
     "load_doric_session",
     "load_session",
+    "read_manifest",
     "spectrum",
 ]
 
@@ -822,7 +826,7 @@ def fit_study(study: Study, settings: FitSettings | None = None,
     Deliberately NOT the hierarchical model. Fitting a cohort jointly is a different
     estimand -- a population contrast rather than a per-session effect -- and giving
     it the same name here would let a caller believe they had one when they had the
-    other. The joint fit will arrive as `fit_cohort` with its own return type.
+    other. The joint fit is `fit_cohort`, with its own return type.
     """
     return [fit_session(s, settings, **kw) for s in study.sessions]
 
@@ -832,3 +836,7 @@ def fit_study(study: Study, settings: FitSettings | None = None,
 # (the GUI among them) import from.
 from photosvi.kernel_calibration import SENSORS as KERNEL_SENSORS  # noqa: E402, I001
 from photosvi.kernel_calibration import KernelCalibration, calibrate_kernel  # noqa: E402
+# The joint cohort fit, in its own module for the same reason.
+from photosvi.cohort_fit import CohortResult, CohortSettings, fit_cohort  # noqa: E402, I001
+# The table of sessions the cohort and calibration commands read.
+from photosvi.cli.manifest import read_manifest  # noqa: E402, I001

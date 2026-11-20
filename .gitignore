@@ -49,3 +49,4 @@ logs/
 .coverage
 .coverage.*
 htmlcov/
+photosvi_toy/

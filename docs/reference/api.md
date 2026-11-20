@@ -15,6 +15,8 @@ which can change between versions.
 
 ::: photosvi.api.load_session
 
+::: photosvi.api.read_manifest
+
 ## Fitting
 
 ::: photosvi.api.FitSettings
@@ -23,9 +25,15 @@ which can change between versions.
 
 ::: photosvi.api.fit_study
 
+::: photosvi.api.CohortSettings
+
+::: photosvi.api.fit_cohort
+
 ## Results
 
 ::: photosvi.api.Result
+
+::: photosvi.api.CohortResult
 
 ::: photosvi.api.events_from_posterior
 

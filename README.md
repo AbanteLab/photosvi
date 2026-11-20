@@ -92,6 +92,17 @@ Both run in seconds on the toy configuration shipped with the package
 The [documentation](https://abantelab.github.io/photosvi/) covers fitting your own
 recordings, choosing settings for your sensor, and reproducing the benchmark.
 
+Your own recordings, Doric files or dF/F traces, can be fitted from the command line:
+
+```bash
+photosvi kernel calibrate rec1.doric rec2.doric --out kernel.yaml   # if not dLight1.3b
+photosvi fit session.doric --kernel kernel.yaml --out run/          # one recording
+photosvi fit-cohort sessions.csv --reference vehicle --out run/     # a cohort
+```
+
+[Fit your own recordings](https://abantelab.github.io/photosvi/fit-your-recordings/)
+describes the inputs, the table of sessions and what each command writes.
+
 From your own data you need three things: a trace as a `[1, T]` tensor of corrected
 dF/F, the injection bin, and the sampling rate. For a cohort, additionally the
 `animal` and `drug` index vectors. Preprocessing (isosbestic correction, bleaching,

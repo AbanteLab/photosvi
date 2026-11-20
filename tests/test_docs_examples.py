@@ -28,9 +28,11 @@ def test_there_are_examples_to_run():
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)
-def test_example_runs(path, monkeypatch):
+def test_example_runs(path, monkeypatch, tmp_path):
     # The examples open configs by relative path, as a reader would from the repo root.
     monkeypatch.chdir(ROOT)
+    # The toy examples write their files here rather than into the source tree.
+    monkeypatch.setenv("PHOTOSVI_TOY", str(tmp_path / "photosvi_toy"))
     runpy.run_path(str(path), run_name="__main__")
 
 

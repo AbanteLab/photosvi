@@ -16,11 +16,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
-import numpy as np
-
-from photosvi.api import FitSettings, fit_session, load_doric_session, load_session
+from photosvi.api import FitSettings, fit_session
+from photosvi.cli.manifest import kernel_settings, load_recording
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -38,35 +36,29 @@ def main(argv: list[str] | None = None) -> None:
                    help="Doric event to use as the injection when no times are given "
                         "(default: the last one recorded)")
     p.add_argument("--out", required=True, help="run directory")
+    p.add_argument("--kernel", default=None,
+                   help="kernel file from `photosvi kernel calibrate` (default: dLight1.3b)")
     p.add_argument("--device", default="auto")
     p.add_argument("--threads", type=int, default=4)
     p.add_argument("--steps", type=int, default=None, help="minimum steps (default: shipped)")
     p.add_argument("--max-steps", type=int, default=None)
     a = p.parse_args(argv)
 
-    path = Path(a.recording)
-    if path.suffix.lower() == ".doric":
-        session, info = load_doric_session(path, inj_start_s=a.inj_start,
-                                           inj_end_s=a.inj_end, event=a.event,
-                                           mask_min_s=a.mask_min_s)
-    else:
-        if a.fs is None or a.inj_start is None:
-            p.error("a trace file needs --fs and --inj-start")
-        session = load_session(path, fs=a.fs, inj_s=a.inj_start, column=a.column)
-        end = a.inj_end if a.inj_end is not None else a.inj_start
-        lo = session.inj_t
-        hi = int(round(max(end, a.inj_start + a.mask_min_s) * a.fs))
-        if hi > lo:
-            keep = np.ones(session.n_samples, dtype=bool)
-            keep[lo:min(hi, session.n_samples)] = False
-            session.mask = keep
-        info = dict(source="user", inj_start_s=a.inj_start, inj_end_s=end,
-                    mask_s=max(0, hi - lo) / a.fs, fs=a.fs)
+    try:
+        session, info = load_recording(a.recording, fs=a.fs, column=a.column,
+                                       inj_start_s=a.inj_start, inj_end_s=a.inj_end,
+                                       event=a.event, mask_min_s=a.mask_min_s)
+    except ValueError as exc:
+        p.error(str(exc))
     print(f"injection at {info['inj_start_s']:.2f} s ({info['source']}), "
           f"{info['mask_s']:.1f} s masked, {session.fs:.2f} Hz, "
           f"{session.n_samples / session.fs / 60:.1f} min")
+    try:
+        kern = kernel_settings(a.kernel, session.fs) if a.kernel else {}
+    except (ValueError, OSError) as exc:
+        p.error(str(exc))
     settings = FitSettings(device=a.device, threads=a.threads, steps=a.steps,
-                           max_steps=a.max_steps)
+                           max_steps=a.max_steps, **kern)
     res = fit_session(session, settings)
     out = res.save(a.out)
     (out / "injection.json").write_text(json.dumps(info, indent=1, default=float))

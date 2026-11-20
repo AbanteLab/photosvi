@@ -1,6 +1,9 @@
 """`photosvi` — single-entry CLI with per-family subcommands.
 
 Usage:
+    photosvi fit session.doric --out run/
+    photosvi fit-cohort sessions.csv --reference vehicle --out run/
+    photosvi kernel calibrate rec1.doric rec2.doric --out kernel.yaml
     photosvi points sweep --config configs/points_guide_sweep.yaml --all --out runs/
 
 The dispatcher parses only `<family> <command>`; remaining argv is forwarded
@@ -19,6 +22,7 @@ _COMMANDS: dict[tuple[str, str], str] = {
     ("points", "sweep"): "photosvi.cli.points.sweep",
     ("kernel", "calibrate"): "photosvi.cli.kernel.calibrate",
     ("fit", None): "photosvi.cli.fit",
+    ("fit-cohort", None): "photosvi.cli.fit_cohort",
 }
 
 
@@ -36,6 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
                           add_help=False)
 
     family.add_parser("fit", help="Fit one recording (single-trace model)", add_help=False)
+    family.add_parser("fit-cohort", help="Fit a cohort (hierarchical model)", add_help=False)
 
     kernel = family.add_parser("kernel", help="The transient kernel")
     kernel_sub = kernel.add_subparsers(dest="command", required=True, metavar="COMMAND")
